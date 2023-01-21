@@ -2,11 +2,22 @@
 # -*- coding: UTF-8 -*-
 
 """
+Python plugin for Domoticz
+Based on stroomkosten.py, found at https://ehoco.nl/stroomkosten-zichtbaar-maken-in-domoticz/
+This scripts saves gas and electricity usage from Domoticz every hour to a csv-file, for later evaluation
+Optional it pushes the costs of usage of gas and electricity back to Domoticz
 
-stroomkosten.py
-
-Leest 'CounterToday' van de energiemeter uit en schrijft de berekende kosten naar een custom sensor. Het script wordt gedraaid via de crontab.
-
+Version 1.1
+Still do do:
+- add gas-costs to the cost quotation
+- detract PV return costs from the cost quotation
+- translate all comments and variables into English
+- add comments
+- delete print commands
+- set user variable for storing location of csv-file
+- switch for putting off current day energy costs
+- add text about required plugins, to be installed through pip
+- add readme-file for Github-users
 """
 
 import requests
@@ -67,7 +78,6 @@ with open('/home/pi/usage.csv', mode='a') as file:
     writer.writerow([datum, kWTotaal, kwTerugTotaal, m3Totaal])
     print("geschreven")
 
-
-# Write value current spendage to
+# Write value current spendage costs of today back to Domoticz
 url = DomoWriteURL + CustomSensorIDX + '&svalue=' + kostenVerbruikVandaag
 r = requests.get(url)
