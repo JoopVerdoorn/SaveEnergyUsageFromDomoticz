@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 """
-Version 1.2
+Version 1.3
 
 Python plugin voor Domoticz
 Plugin is gebaseerd op stroomkosten.py, te vinden op https://ehoco.nl/stroomkosten-zichtbaar-maken-in-domoticz/
@@ -10,15 +10,12 @@ Doelen van dit script:
 - historie opbouwen van gas en stroomgebruik, samen met dynamische energietarieven, om later te kunnen evalueren in Excel hoe een dynamisch contract uitgewerkt zou hebben in verhouding tot een vast contract
 - dagelijkse energiekosten in Domoticz tonen, op basis van contract met vaste tarieven en met dynamische tarieven
  
-Dit script slaat gas en stroomgebruik vanuit Domoticz op in een csv-bestand en moet via cron (in te stellen via crontab -e) elk uur uitgevoerd worden. Het bestand usage.csv moet met het touch-commando aangemaakt wordenOptional it pushes the costs of usage of gas and electricity back to Domo$
+Dit script slaat gas en stroomgebruik vanuit Domoticz op in een csv-bestand en moet via cron (in te stellen via crontab -e) elk uur uitgevoerd worden. Het bestand usage.csv moet met het touch-commando aangemaakt wordenOptional it pushes the costs of usage of gas and electricity back to Domoticz. Om het energieverbruik beter te kunnen duiden wordt ook de buitentemperatuur elk uur opgeslagen
 Dit script uitvoeren om ..:30 elk uur. Daardoor wordt de uurprijs voor stroom gebruikt die past bij het verbruik van het afgelpen uur, welke om ..:00 opgehaald en berekend wordt.
 
 Nog te doen:
-- In csv-bestand EUR/kWh, EUR/m³ en C verwijderen
-- Lua-script functionaliteit voor ophalen stroom- en gasprijs naar dit script overzetten 
+- Lua-script functionaliteit voor ophalen stroom- en gasprijs naar 2 python-scripts overzetten, waarbij stroom om 16:00 de dag ervoor en gas om 00:30 op de dag zelf wordt opgehaald en stroomprijzen voor 24 uur naar CSV-bestand weggeschreven wordt 
 - Lua-script voor berekenen van werkelijk stroomverbruik (alsof er geen PV-installatie aanwezig is) naar dit script overzetten 
-- Kosten van gas toevoegen aan dagelijkse vaste en dynamische energiekosten
-- Terugleverkosten vanwege PV aftrekken van dagelijkse vaste en dynamische energiekosten
 - Een user variable definieren voor de opslaglocatie van het csv-bestand
 - Switch om het berekenen van dagelijkse kosten niet uit te voeren
 - Switch om buitentemperatuur niet op te halen en op te slaan
@@ -62,13 +59,14 @@ def domoticzread(idx, var):
     result = jsonData['result'][0][var]
     return result;
 
-def domoticzread2(idx):
-    # ongebruikte functie, te gebruiken om de onderdelen van een object te kunnen zien en die te kunnen gebruiken in domoticzread(idx, var):
+def discoverDeviceCharateristics(idx):
+    # ongebruikte functie, te gebruiken om de parameters van een Domoticz device te kunnen ontdekken en die te kunnen gebruiken in domoticzread(idx, var):
     url = DomoBaseURL + idx
     response = requests.get(url)
     jsonData = json.loads(response.text)
     result = jsonData['result'][0]
     print (result)
+    return result;
 
 def domoticzwrite(idx, var):
     # Write value of a custom sensor back to Domoticz
@@ -82,11 +80,14 @@ def main():
     buitenTemperatuur = domoticzread(buitenThermometerIDX, 'Data')
     
     # 30 minten slapen om er zeker van te zijn dat juiste  energieprijs om ..:30 wordt opgehaald en verbruik om ..:00
-    time.sleep(1800) 
+    time.sleep(1800)
+    #time.sleep(1) #te gebruiken bij testen
+
+    # Ophalen verbruik vanuit Domoticz op het hele uur
     kWVandaag = domoticzread(EnergiemeterIDX, 'CounterToday')
     kWTotaal = domoticzread(EnergiemeterIDX, 'Counter')
-    kwTerugVandaag = domoticzread(EnergiemeterIDX, 'CounterDelivToday') 
-    kwTerugTotaal = domoticzread(EnergiemeterIDX, 'CounterDeliv')
+    kWTerugVandaag = domoticzread(EnergiemeterIDX, 'CounterDelivToday') 
+    kWTerugTotaal = domoticzread(EnergiemeterIDX, 'CounterDeliv')
     
     werkelijkStroomverbruikVandaag = domoticzread(werkelijkStroomverbruikIDX, 'CounterToday')
     m3Vandaag = domoticzread(GasmeterIDX, 'CounterToday')
@@ -95,27 +96,32 @@ def main():
 
     # Berekenen van dagelijkse energiekosten bij contract met vaste prijzen
     kWhVerbruikVandaag = kWVandaag.split()[0]
-    kostenVerbruikVandaagVast = round((float(kWhVerbruikVandaag) * vasteStroomprijs*100 ) / 100 ,2)
-    """Nog aanvullen"""
+    kWhTerugVandaag = kWTerugVandaag.split()[0]
+    m3VerbruikVandaag = m3Vandaag.split()[0]
+    kostenVerbruikVandaagVast = round(((float(kWhVerbruikVandaag) - float(kWhTerugVandaag)) * vasteStroomprijs*100 ) / 100 ,2) + round((float(m3VerbruikVandaag) * vasteGasprijs*100 ) / 100 ,2)
     
     # Berekenen van dagelijkse energiekosten bij contract met dynamische prijzen
-    """Nog aanvullen"""
+    kWVandaag = kWVandaag.split()[0]
+    kWTerugVandaag = kWTerugVandaag.split()[0]
+    m3VerbruikVandaag = m3Vandaag.split()[0]
+    dagprijsGas = dagprijsGas.split()[0] 
+    uurprijsStroom = uurprijsStroom.split()[0]
+    kostenVerbruikVandaagDynamisch = round(((float(kWVandaag) - float(kWTerugVandaag)) * float(uurprijsStroom)*100 ) / 100 ,2) + round((float(m3VerbruikVandaag) * float(dagprijsGas)*100 ) / 100 ,2)
 
+    # Actuele tijd naar lokale tijd zetten
     nu=dt.datetime.now(dt.timezone.utc)
     datum=utc2local(nu)
-    #print(datum)
 
     # Write values to file
     with open('/home/pi/usage.csv', mode='a') as file:
         # Create a csv writer object and write
         writer = csv.writer(file)
-        writer.writerow([datum, kWTotaal, kwTerugTotaal, uurprijsStroom, werkelijkStroomverbruikVandaag, m3Totaal, dagprijsGas, buitenTemperatuur])
-        #print("geschreven")
+        writer.writerow([datum, kWTotaal, kWTerugTotaal, uurprijsStroom.replace(" EUR/kWh", ""), werkelijkStroomverbruikVandaag.replace(" kWh", ""), m3Totaal, dagprijsGas.replace(" EUR/m³", ""), buitenTemperatuur.replace(" C", "")])
     
-    # Energiekosten naar Domoticz schrijven
+    # Energiekosten naar Domoticz schrijven, alleen om ..:00 dus actueel, want ververst maar 1x per uur
     kostenVerbruikVandaagVast = str(kostenVerbruikVandaagVast) + " Euro"
+    kostenVerbruikVandaagDynamisch = str(kostenVerbruikVandaagDynamisch) + " Euro" 
     domoticzwrite(energiekostenHuidigContractIDX, kostenVerbruikVandaagVast)
+    domoticzwrite(energiekostenDynamischContractIDX, kostenVerbruikVandaagDynamisch) 
 
 main()
-
-
