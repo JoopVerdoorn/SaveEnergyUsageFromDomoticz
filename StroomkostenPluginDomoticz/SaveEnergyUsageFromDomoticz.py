@@ -3,25 +3,8 @@
 
 """
 Version 1.3
-
 Python plugin voor Domoticz
-Plugin is gebaseerd op stroomkosten.py, te vinden op https://ehoco.nl/stroomkosten-zichtbaar-maken-in-domoticz/
-Doelen van dit script:
-- historie opbouwen van gas en stroomgebruik, samen met dynamische energietarieven, om later te kunnen evalueren in Excel hoe een dynamisch contract uitgewerkt zou hebben in verhouding tot een vast contract
-- dagelijkse energiekosten in Domoticz tonen, op basis van contract met vaste tarieven en met dynamische tarieven
- 
-Dit script slaat gas en stroomgebruik vanuit Domoticz op in een csv-bestand en moet via cron (in te stellen via crontab -e) elk uur uitgevoerd worden. Het bestand usage.csv moet met het touch-commando aangemaakt wordenOptional it pushes the costs of usage of gas and electricity back to Domoticz. Om het energieverbruik beter te kunnen duiden wordt ook de buitentemperatuur elk uur opgeslagen
-Dit script uitvoeren om ..:30 elk uur. Daardoor wordt de uurprijs voor stroom gebruikt die past bij het verbruik van het afgelpen uur, welke om ..:00 opgehaald en berekend wordt.
 
-Nog te doen:
-- Lua-script functionaliteit voor ophalen stroom- en gasprijs naar 2 python-scripts overzetten, waarbij stroom om 16:00 de dag ervoor en gas om 00:30 op de dag zelf wordt opgehaald en stroomprijzen voor 24 uur naar CSV-bestand weggeschreven wordt 
-- Lua-script voor berekenen van werkelijk stroomverbruik (alsof er geen PV-installatie aanwezig is) naar dit script overzetten 
-- Een user variable definieren voor de opslaglocatie van het csv-bestand
-- Switch om het berekenen van dagelijkse kosten niet uit te voeren
-- Switch om buitentemperatuur niet op te halen en op te slaan
-- Switch om werkelijk energieverbruik niet op te halen en op te slaan
-- Hier tekst toevoegen over de vereiste modules, te installeren via pip
-- Readme-file voor Github-users maken
 """
 
 import requests
@@ -112,9 +95,8 @@ def main():
     nu=dt.datetime.now(dt.timezone.utc)
     datum=utc2local(nu)
 
-    # Write values to file
+    # Waarden naar bestaand csv-bestand sturen
     with open('/home/pi/usage.csv', mode='a') as file:
-        # Create a csv writer object and write
         writer = csv.writer(file)
         writer.writerow([datum, kWTotaal, kWTerugTotaal, uurprijsStroom.replace(" EUR/kWh", ""), werkelijkStroomverbruikVandaag.replace(" kWh", ""), m3Totaal, dagprijsGas.replace(" EUR/m³", ""), buitenTemperatuur.replace(" C", "")])
     
