@@ -2,9 +2,8 @@
 # -*- coding: UTF-8 -*-
 
 """
-Version 1.3
+Version 1.4
 Python plugin voor Domoticz
-
 """
 
 import requests
