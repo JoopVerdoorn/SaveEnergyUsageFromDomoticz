@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 """
-Version 1.4
+Version 1.4b
 Python plugin voor Domoticz
 """
 
